@@ -1,6 +1,5 @@
 package com.example.ui.auth
 
-import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.Image
@@ -26,21 +25,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BackHand
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Login
-import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +53,7 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,6 +72,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.credentials.ClearCredentialStateRequest
@@ -110,6 +116,7 @@ fun attemptAutoSignIn(
         return
     }
 
+    val activityContext = context.findActivity() ?: context
     val googleIdOption = GetGoogleIdOption.Builder()
         .setFilterByAuthorizedAccounts(true)
         .setServerClientId(clientId)
@@ -120,7 +127,7 @@ fun attemptAutoSignIn(
 
     scope.launch {
         try {
-            val result = credentialManager.getCredential(context, request)
+            val result = credentialManager.getCredential(activityContext, request)
             val credential = result.credential
             if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
@@ -151,12 +158,13 @@ fun onGoogleSignInClicked(
         return
     }
 
+    val activityContext = context.findActivity() ?: context
     val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
     val request = GetCredentialRequest.Builder().addCredentialOption(signInOption).build()
 
     scope.launch {
         try {
-            val result = credentialManager.getCredential(context as Activity, request)
+            val result = credentialManager.getCredential(activityContext, request)
             val credential = result.credential
             if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
@@ -222,9 +230,19 @@ fun AuthScreen(
     val credentialManager = remember(context) { CredentialManager.create(context) }
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
 
-    // 0 = Sign In (Existing User), 1 = Register (New User + Birth Chart Setup)
+    // 0 = Sign In, 1 = Register
     var selectedAuthTab by rememberSaveable { mutableIntStateOf(0) }
+
+    // Manual Sign-In state
+    var loginIdentifier by rememberSaveable { mutableStateOf("") }
+    var loginPassword by rememberSaveable { mutableStateOf("") }
+    var showLoginPassword by rememberSaveable { mutableStateOf(false) }
+
+    // Registration state (Manual + Google)
     var regFullName by rememberSaveable { mutableStateOf("") }
+    var regEmailOrMobile by rememberSaveable { mutableStateOf("") }
+    var regPassword by rememberSaveable { mutableStateOf("") }
+    var showRegPassword by rememberSaveable { mutableStateOf(false) }
     var regBirthDate by rememberSaveable { mutableStateOf("1998-05-14") }
     var regBirthTime by rememberSaveable { mutableStateOf("10:30 AM") }
     var regBirthPlace by rememberSaveable { mutableStateOf("Varanasi, UP (25.32°N, 83.00°E)") }
@@ -233,8 +251,6 @@ fun AuthScreen(
     val errorMessage = (authState as? UserAuthUiState.Error)?.message
 
     LaunchedEffect(Unit) {
-        // Allow initial Activity window sync (SurfaceSyncGroup) to finish rendering first frame
-        // before initiating cross-process Play Services CredentialManager IPC.
         androidx.compose.runtime.withFrameNanos { }
         kotlinx.coroutines.delay(350L)
         authViewModel.attemptSilentSignIn(
@@ -260,27 +276,27 @@ fun AuthScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top bar with Dark Mode toggle
+            // Top bar with Theme Toggle
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 560.dp),
+                    .widthIn(max = 520.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = "Verified Vedic Portal",
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "JevanMantra Jyotish",
+                        text = "JevanMantra Vedic AI",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -298,81 +314,79 @@ fun AuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Hero Cosmic Banner + Overlapping Logo Emblem
+            // Sleek Compact Cosmic Header with Logo
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 560.dp),
-                contentAlignment = Alignment.BottomCenter
+                    .widthIn(max = 520.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.img_cosmic_banner_1794486167917),
-                    contentDescription = "Vedic Astrology Cosmic Banner",
+                    contentDescription = "Vedic Astrology Banner",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(175.dp)
-                        .clip(RoundedCornerShape(24.dp))
+                        .height(130.dp)
+                        .clip(RoundedCornerShape(22.dp))
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(175.dp)
-                        .clip(RoundedCornerShape(24.dp))
+                        .height(130.dp)
+                        .clip(RoundedCornerShape(22.dp))
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.15f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.85f)
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.25f),
+                                    MaterialTheme.colorScheme.background.copy(alpha = 0.88f)
                                 )
                             )
                         )
                 )
-                Image(
-                    painter = painterResource(id = R.drawable.img_launcher_icon_1794486134011),
-                    contentDescription = "JevanMantra Logo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(82.dp)
-                        .clip(CircleShape)
-                        .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(
+                        painter = painterResource(id = R.drawable.img_launcher_icon_1794486134011),
+                        contentDescription = "JevanMantra Logo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "JevanMantra",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Free AI Kundali • 36-Guna Milan • Hastrekha Scan",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            Text(
-                text = "JevanMantra",
-                style = MaterialTheme.typography.displayMedium,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "AI Kundali • 36-Guna Milan • Hastrekha Palm Scan • Daily Rashifal",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Sign In & Registration Card
+            // Main Clean & Attractive Auth Card (Sign In | Register)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 560.dp),
-                shape = RoundedCornerShape(22.dp),
+                    .widthIn(max = 520.dp),
+                shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
-                )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     PrimaryTabRow(
                         selectedTabIndex = selectedAuthTab,
-                        modifier = Modifier.clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                        modifier = Modifier.clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     ) {
                         Tab(
                             selected = selectedAuthTab == 0,
@@ -380,8 +394,14 @@ fun AuthScreen(
                                 authViewModel.clearError()
                                 selectedAuthTab = 0
                             },
-                            icon = { Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            text = { Text("Sign In") },
+                            icon = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Login,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            text = { Text("Sign In", fontWeight = FontWeight.SemiBold) },
                             modifier = Modifier.testTag("auth_tab_sign_in")
                         )
                         Tab(
@@ -390,8 +410,14 @@ fun AuthScreen(
                                 authViewModel.clearError()
                                 selectedAuthTab = 1
                             },
-                            icon = { Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            text = { Text("Register") },
+                            icon = {
+                                Icon(
+                                    Icons.Default.PersonAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            text = { Text("Register", fontWeight = FontWeight.SemiBold) },
                             modifier = Modifier.testTag("auth_tab_register")
                         )
                     }
@@ -399,7 +425,7 @@ fun AuthScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(18.dp),
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         if (errorMessage != null) {
@@ -407,6 +433,7 @@ fun AuthScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("auth_error_card"),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.errorContainer
                                 )
@@ -421,21 +448,108 @@ fun AuthScreen(
                         }
 
                         if (selectedAuthTab == 0) {
-                            // --- SIGN IN TAB ---
+                            // ================= SIGN IN TAB =================
                             Text(
                                 text = "Welcome Back, Seeker 🙏",
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Sign in with your Google account to access your saved Janam Kundali birth charts, Kundli Milan reports, and AI Jyotish Q&A history.",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = "Sign in manually with your account details or continue with Google.",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = loginIdentifier,
+                                onValueChange = {
+                                    authViewModel.clearError()
+                                    loginIdentifier = it
+                                },
+                                label = { Text("Email, Mobile or Full Name") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Person, contentDescription = null)
+                                },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("manual_login_identifier_input")
+                            )
 
+                            OutlinedTextField(
+                                value = loginPassword,
+                                onValueChange = {
+                                    authViewModel.clearError()
+                                    loginPassword = it
+                                },
+                                label = { Text("Password") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Lock, contentDescription = null)
+                                },
+                                trailingIcon = {
+                                    IconButton(onClick = { showLoginPassword = !showLoginPassword }) {
+                                        Icon(
+                                            imageVector = if (showLoginPassword) {
+                                                Icons.Default.VisibilityOff
+                                            } else {
+                                                Icons.Default.Visibility
+                                            },
+                                            contentDescription = "Toggle Password Visibility"
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (showLoginPassword) {
+                                    VisualTransformation.None
+                                } else {
+                                    PasswordVisualTransformation()
+                                },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("manual_login_password_input")
+                            )
+
+                            // Option 1: Manual Sign In Button
                             Button(
+                                onClick = {
+                                    authViewModel.clearError()
+                                    authViewModel.signInManually(
+                                        identifier = loginIdentifier,
+                                        password = loginPassword
+                                    )
+                                },
+                                enabled = !isLoading,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                                    .testTag("manual_sign_in_button")
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(22.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.5.dp
+                                    )
+                                } else {
+                                    Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Sign In Manually",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            OrDivider(text = "OR")
+
+                            // Option 2: Google Sign In Button
+                            OutlinedButton(
                                 onClick = {
                                     authViewModel.clearError()
                                     authViewModel.signInWithGoogle(
@@ -444,67 +558,113 @@ fun AuthScreen(
                                     )
                                 },
                                 enabled = !isLoading,
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                ),
+                                shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(54.dp)
+                                    .height(52.dp)
                                     .testTag("google_sign_in_button")
                             ) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        strokeWidth = 2.5.dp
-                                    )
-                                } else {
-                                    Text(
-                                        text = "Sign in with Google",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Continue with Google",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
 
-                            OutlinedButton(
+                            TextButton(
                                 onClick = {
                                     authViewModel.clearError()
                                     selectedAuthTab = 1
                                 },
-                                shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("switch_to_register_button")
                             ) {
-                                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("New to JevanMantra? Create Vedic Account")
+                                Text("New to JevanMantra? Create Free Account →")
                             }
                         } else {
-                            // --- REGISTRATION TAB ---
+                            // ================= REGISTER TAB (MANUAL & GOOGLE) =================
                             Text(
-                                text = "Create Your Vedic Profile & Birth Chart",
+                                text = "Create Vedic Profile & Janam Kundali",
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "Enter your birth details below and register securely with Google. Your first Janam Kundali chart will be generated and saved automatically.",
+                                text = "Fill your birth details once — register manually or link your Google account.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             OutlinedTextField(
                                 value = regFullName,
-                                onValueChange = { regFullName = it },
+                                onValueChange = {
+                                    authViewModel.clearError()
+                                    regFullName = it
+                                },
                                 label = { Text("Full Name (e.g., Aarav Sharma)") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Person, contentDescription = null)
+                                },
                                 singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("register_name_input")
                             )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = regEmailOrMobile,
+                                    onValueChange = {
+                                        authViewModel.clearError()
+                                        regEmailOrMobile = it
+                                    },
+                                    label = { Text("Email or Mobile") },
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .weight(1.1f)
+                                        .testTag("register_email_input")
+                                )
+
+                                OutlinedTextField(
+                                    value = regPassword,
+                                    onValueChange = {
+                                        authViewModel.clearError()
+                                        regPassword = it
+                                    },
+                                    label = { Text("Password") },
+                                    trailingIcon = {
+                                        IconButton(onClick = { showRegPassword = !showRegPassword }) {
+                                            Icon(
+                                                imageVector = if (showRegPassword) {
+                                                    Icons.Default.VisibilityOff
+                                                } else {
+                                                    Icons.Default.Visibility
+                                                },
+                                                contentDescription = "Toggle Password"
+                                            )
+                                        }
+                                    },
+                                    visualTransformation = if (showRegPassword) {
+                                        VisualTransformation.None
+                                    } else {
+                                        PasswordVisualTransformation()
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .weight(0.95f)
+                                        .testTag("register_password_input")
+                                )
+                            }
 
                             OutlinedTextField(
                                 value = regBirthDate,
@@ -530,143 +690,162 @@ fun AuthScreen(
                                 inputTestTag = "register_place_input"
                             )
 
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            // Option 1: Manual Registration Button
                             Button(
                                 onClick = {
                                     authViewModel.clearError()
-                                    authViewModel.registerWithGoogle(
-                                        context = context,
-                                        credentialManager = credentialManager,
+                                    authViewModel.registerManually(
                                         fullName = regFullName,
+                                        emailOrMobile = regEmailOrMobile,
+                                        password = regPassword,
                                         birthDate = regBirthDate,
                                         birthTime = regBirthTime,
                                         birthPlace = regBirthPlace
                                     )
                                 },
                                 enabled = !isLoading,
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(54.dp)
-                                    .testTag("register_with_google_button")
+                                    .height(52.dp)
+                                    .testTag("manual_register_button")
                             ) {
                                 if (isLoading) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
+                                        modifier = Modifier.size(22.dp),
                                         color = MaterialTheme.colorScheme.onPrimary,
                                         strokeWidth = 2.5.dp
                                     )
                                 } else {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Register & Save Kundali with Google",
-                                        style = MaterialTheme.typography.titleMedium,
+                                        text = "Register Manually & Create Kundali",
+                                        style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
 
+                            OrDivider(text = "OR")
+
+                            // Option 2: Google Registration Button
                             OutlinedButton(
                                 onClick = {
                                     authViewModel.clearError()
-                                    authViewModel.signInWithGoogle(
+                                    authViewModel.registerWithGoogle(
                                         context = context,
-                                        credentialManager = credentialManager
+                                        credentialManager = credentialManager,
+                                        fullName = regFullName.ifBlank { "JevanMantra Seeker" },
+                                        birthDate = regBirthDate,
+                                        birthTime = regBirthTime,
+                                        birthPlace = regBirthPlace
                                     )
                                 },
                                 enabled = !isLoading,
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("google_sign_in_button")
+                                    .height(52.dp)
+                                    .testTag("register_with_google_button")
                             ) {
-                                Text("Already registered? Sign in with Google")
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Register & Sync with Google",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Feature Highlights Card
-            Card(
+            // Compact 3-pill Feature Strip
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 560.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-                )
+                    .widthIn(max = 520.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    FeatureHighlightRow(
-                        icon = Icons.Default.AutoAwesome,
-                        title = "100% Free AI Kundali & Unlimited Q&A",
-                        subtitle = "Generate North-Indian Janam Kundali birth charts and ask AI Jyotish Acharya any question."
-                    )
-                    FeatureHighlightRow(
-                        icon = Icons.Default.BackHand,
-                        title = "Samudrika Shastra Hand & Palm Analysis",
-                        subtitle = "Scan your palm lines (Life, Heart, Head & Fate lines) with multimodal AI vision."
-                    )
-                    FeatureHighlightRow(
-                        icon = Icons.Default.Favorite,
-                        title = "Ashta-Koota 36-Guna Kundli Milan",
-                        subtitle = "Instant marriage compatibility scoring, Mangal Dosha check & AI remedies."
-                    )
-                    FeatureHighlightRow(
-                        icon = Icons.Default.NotificationsActive,
-                        title = "Daily Rashifal & Shubh Muhurat Alerts",
-                        subtitle = "Personalized daily predictions and morning push notifications for your Rashi."
-                    )
-                }
+                CompactFeatureBadge(
+                    icon = Icons.Default.AutoAwesome,
+                    label = "Free AI Kundali",
+                    modifier = Modifier.weight(1f)
+                )
+                CompactFeatureBadge(
+                    icon = Icons.Default.Favorite,
+                    label = "36-Guna Milan",
+                    modifier = Modifier.weight(1f)
+                )
+                CompactFeatureBadge(
+                    icon = Icons.Default.BackHand,
+                    label = "Palm Scan",
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun FeatureHighlightRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String
-) {
+private fun OrDivider(text: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+        Text(
+            text = "  $text  ",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+@Composable
+private fun CompactFeatureBadge(
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = title,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(22.dp)
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
             )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

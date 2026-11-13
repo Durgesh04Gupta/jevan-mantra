@@ -59,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.preferences.UserPreferencesRepository
 import com.example.ui.auth.SignInScreen
+import com.example.ui.auth.UserAuthUiState
 import com.example.ui.auth.UserAuthViewModel
 import com.example.ui.screens.HomeRashifalScreen
 import com.example.ui.screens.KundaliAndQaScreen
@@ -97,11 +98,12 @@ fun JevanMantraRootApp() {
     val authViewModel: UserAuthViewModel = viewModel(
         factory = UserAuthViewModel.provideFactory(context)
     )
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val currentUser by authViewModel.currentUser.collectAsStateWithLifecycle()
 
     JevanMantraTheme(darkTheme = userPrefs.isDarkMode) {
-        val user = currentUser
-        if (user == null) {
+        val authenticatedSession = authState as? UserAuthUiState.Authenticated
+        if (authenticatedSession == null) {
             SignInScreen(
                 authViewModel = authViewModel,
                 isDarkMode = userPrefs.isDarkMode,
@@ -110,13 +112,14 @@ fun JevanMantraRootApp() {
                 }
             )
         } else {
-            key(user.uid) {
+            key(authenticatedSession.uid) {
                 val viewModel: AstrologyViewModel = viewModel(
-                    key = user.uid,
-                    factory = AstrologyViewModel.provideFactory(context, user.uid)
+                    key = authenticatedSession.uid,
+                    factory = AstrologyViewModel.provideFactory(context, authenticatedSession.uid)
                 )
                 JevanMantraMainScaffold(
-                    currentUser = user,
+                    authenticatedSession = authenticatedSession,
+                    currentUser = currentUser,
                     authViewModel = authViewModel,
                     viewModel = viewModel
                 )
@@ -128,7 +131,8 @@ fun JevanMantraRootApp() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun JevanMantraMainScaffold(
-    currentUser: com.google.firebase.auth.FirebaseUser,
+    authenticatedSession: UserAuthUiState.Authenticated,
+    currentUser: com.google.firebase.auth.FirebaseUser?,
     authViewModel: UserAuthViewModel,
     viewModel: AstrologyViewModel
 ) {
@@ -298,6 +302,9 @@ private fun JevanMantraMainScaffold(
                 )
                 4 -> SettingsAndProfileScreen(
                     currentUser = currentUser,
+                    userDisplayName = authenticatedSession.displayName,
+                    userEmailOrPhone = authenticatedSession.email,
+                    isGoogleAccount = authenticatedSession.isGoogleAccount,
                     preferences = preferences,
                     onToggleDarkMode = viewModel::toggleDarkMode,
                     onUpdateNotifications = { enabled, h, m ->

@@ -25,6 +25,7 @@ import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.Schema
 import com.google.firebase.ai.type.content
 import com.google.firebase.ai.type.generationConfig
+import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
@@ -113,8 +114,21 @@ class AstrologyViewModel(
             initialValue = UserPreferences()
         )
 
-    // --- FIRESTORE REALTIME COLLECTIONS (Two-Tier Flow Error Handling) ---
-    val savedKundalis: StateFlow<DataListState<KundaliProfile>> = repository.observeKundalis(currentUserId)
+    private val isCloudUser: Boolean
+        get() = Firebase.auth.currentUser != null && !currentUserId.startsWith("manual_")
+
+    private val _localKundalis = MutableStateFlow<List<KundaliProfile>>(emptyList())
+    private val _localMilanReports = MutableStateFlow<List<MilanReport>>(emptyList())
+    private val _localPalmReadings = MutableStateFlow<List<PalmReading>>(emptyList())
+
+    // --- FIRESTORE REALTIME COLLECTIONS (Two-Tier Flow Error Handling + Manual Account Support) ---
+    val savedKundalis: StateFlow<DataListState<KundaliProfile>> = (
+        if (isCloudUser) {
+            repository.observeKundalis(currentUserId)
+        } else {
+            _localKundalis
+        }
+        )
         .map<List<KundaliProfile>, DataListState<KundaliProfile>> { DataListState.Success(it) }
         .catch { error ->
             val firestoreError = generateSequence(error) { it.cause }
@@ -131,7 +145,13 @@ class AstrologyViewModel(
             initialValue = DataListState.Loading
         )
 
-    val savedMilanReports: StateFlow<DataListState<MilanReport>> = repository.observeMilanReports(currentUserId)
+    val savedMilanReports: StateFlow<DataListState<MilanReport>> = (
+        if (isCloudUser) {
+            repository.observeMilanReports(currentUserId)
+        } else {
+            _localMilanReports
+        }
+        )
         .map<List<MilanReport>, DataListState<MilanReport>> { DataListState.Success(it) }
         .catch { error ->
             val firestoreError = generateSequence(error) { it.cause }
@@ -148,7 +168,13 @@ class AstrologyViewModel(
             initialValue = DataListState.Loading
         )
 
-    val savedPalmReadings: StateFlow<DataListState<PalmReading>> = repository.observePalmReadings(currentUserId)
+    val savedPalmReadings: StateFlow<DataListState<PalmReading>> = (
+        if (isCloudUser) {
+            repository.observePalmReadings(currentUserId)
+        } else {
+            _localPalmReadings
+        }
+        )
         .map<List<PalmReading>, DataListState<PalmReading>> { DataListState.Success(it) }
         .catch { error ->
             val firestoreError = generateSequence(error) { it.cause }
@@ -220,6 +246,36 @@ class AstrologyViewModel(
 
     private val _statusBanner = MutableStateFlow<String?>(null)
     val statusBanner: StateFlow<String?> = _statusBanner.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            preferencesRepository.preferencesFlow.collect { prefs ->
+                if (prefs.manualFullName.isNotBlank() && _localKundalis.value.isEmpty()) {
+                    val chart = VedicAstrologyEngine.calculateKundaliChart(
+                        prefs.manualFullName,
+                        prefs.manualBirthDate,
+                        prefs.manualBirthTime,
+                        prefs.manualBirthPlace
+                    )
+                    val initialProfile = KundaliProfile(
+                        id = "local_primary",
+                        userId = currentUserId,
+                        name = prefs.manualFullName,
+                        birthDate = prefs.manualBirthDate,
+                        birthTime = chart.formattedBirthTime,
+                        birthPlace = prefs.manualBirthPlace,
+                        rashi = chart.rashi,
+                        nakshatra = chart.nakshatra,
+                        lagna = chart.lagna,
+                        aiSummary = "Lagna: ${chart.lagna}, Rashi: ${chart.rashi}, Nakshatra: ${chart.nakshatra}"
+                    )
+                    _activeKundaliChart.value = chart
+                    _activeKundaliMeta.value = initialProfile
+                    _localKundalis.value = listOf(initialProfile)
+                }
+            }
+        }
+    }
 
     fun clearStatusBanner() {
         _statusBanner.value = null
@@ -413,18 +469,35 @@ class AstrologyViewModel(
                 if (finalSummary.isNotBlank()) {
                     _kundaliAiState.value = AiGenerationState.Success(finalSummary)
                     if (saveToCloud) {
-                        val saveRes = repository.createKundali(
-                            name = cleanName,
-                            birthDate = cleanDate,
-                            birthTime = cleanTime,
-                            birthPlace = cleanPlace,
-                            rashi = chart.rashi,
-                            nakshatra = chart.nakshatra,
-                            lagna = chart.lagna,
-                            aiSummary = finalSummary
-                        )
-                        if (saveRes.isSuccess) {
-                            _statusBanner.value = "Kundali for $cleanName saved to your cloud account"
+                        if (isCloudUser) {
+                            val saveRes = repository.createKundali(
+                                name = cleanName,
+                                birthDate = cleanDate,
+                                birthTime = cleanTime,
+                                birthPlace = cleanPlace,
+                                rashi = chart.rashi,
+                                nakshatra = chart.nakshatra,
+                                lagna = chart.lagna,
+                                aiSummary = finalSummary
+                            )
+                            if (saveRes.isSuccess) {
+                                _statusBanner.value = "Kundali for $cleanName saved to your cloud account"
+                            }
+                        } else {
+                            val newItem = KundaliProfile(
+                                id = UUID.randomUUID().toString(),
+                                userId = currentUserId,
+                                name = cleanName,
+                                birthDate = cleanDate,
+                                birthTime = cleanTime,
+                                birthPlace = cleanPlace,
+                                rashi = chart.rashi,
+                                nakshatra = chart.nakshatra,
+                                lagna = chart.lagna,
+                                aiSummary = finalSummary
+                            )
+                            _localKundalis.value = listOf(newItem) + _localKundalis.value.filterNot { it.name == cleanName && it.birthDate == cleanDate }
+                            _statusBanner.value = "Kundali for $cleanName saved to your profile"
                         }
                     }
                 } else {
@@ -458,7 +531,11 @@ class AstrologyViewModel(
 
     fun deleteSavedKundali(id: String) {
         viewModelScope.launch {
-            repository.deleteKundali(id)
+            if (isCloudUser) {
+                repository.deleteKundali(id)
+            } else {
+                _localKundalis.value = _localKundalis.value.filterNot { it.id == id }
+            }
         }
     }
 
@@ -588,15 +665,30 @@ class AstrologyViewModel(
                 val finalAnalysis = accumulated.toString()
                 if (finalAnalysis.isNotBlank()) {
                     _milanAiState.value = AiGenerationState.Success(finalAnalysis)
-                    repository.saveMilanReport(
-                        boyName = cleanBoy,
-                        boyDetails = "$boyDate • ${result.boyRashi}",
-                        girlName = cleanGirl,
-                        girlDetails = "$girlDate • ${result.girlRashi}",
-                        totalGuna = result.totalGuna,
-                        compatibilityVerdict = result.verdict,
-                        aiAnalysis = finalAnalysis
-                    )
+                    if (isCloudUser) {
+                        repository.saveMilanReport(
+                            boyName = cleanBoy,
+                            boyDetails = "$boyDate • ${result.boyRashi}",
+                            girlName = cleanGirl,
+                            girlDetails = "$girlDate • ${result.girlRashi}",
+                            totalGuna = result.totalGuna,
+                            compatibilityVerdict = result.verdict,
+                            aiAnalysis = finalAnalysis
+                        )
+                    } else {
+                        val localReport = MilanReport(
+                            id = UUID.randomUUID().toString(),
+                            userId = currentUserId,
+                            boyName = cleanBoy,
+                            boyDetails = "$boyDate • ${result.boyRashi}",
+                            girlName = cleanGirl,
+                            girlDetails = "$girlDate • ${result.girlRashi}",
+                            totalGuna = result.totalGuna.toLong(),
+                            compatibilityVerdict = result.verdict,
+                            aiAnalysis = finalAnalysis
+                        )
+                        _localMilanReports.value = listOf(localReport) + _localMilanReports.value
+                    }
                     _statusBanner.value = "Kundli Milan report ($cleanBoy & $cleanGirl) saved"
                 } else {
                     _milanAiState.value = AiGenerationState.Error("Empty compatibility analysis returned.")
@@ -615,7 +707,11 @@ class AstrologyViewModel(
 
     fun deleteMilanReport(reportId: String) {
         viewModelScope.launch {
-            repository.deleteMilanReport(reportId)
+            if (isCloudUser) {
+                repository.deleteMilanReport(reportId)
+            } else {
+                _localMilanReports.value = _localMilanReports.value.filterNot { it.id == reportId }
+            }
         }
     }
 
@@ -664,14 +760,28 @@ class AstrologyViewModel(
 
                 _palmAnalysisState.value = PalmAnalysisUiState.Success(result)
 
-                repository.savePalmReading(
-                    handSide = result.handSide,
-                    lifeLineSummary = result.lifeLineSummary,
-                    heartLineSummary = result.heartLineSummary,
-                    headLineSummary = result.headLineSummary,
-                    fateAndMounts = result.fateAndMounts,
-                    remedies = result.remedies
-                )
+                if (isCloudUser) {
+                    repository.savePalmReading(
+                        handSide = result.handSide,
+                        lifeLineSummary = result.lifeLineSummary,
+                        heartLineSummary = result.heartLineSummary,
+                        headLineSummary = result.headLineSummary,
+                        fateAndMounts = result.fateAndMounts,
+                        remedies = result.remedies
+                    )
+                } else {
+                    val localPalm = PalmReading(
+                        id = UUID.randomUUID().toString(),
+                        userId = currentUserId,
+                        handSide = result.handSide,
+                        lifeLineSummary = result.lifeLineSummary,
+                        heartLineSummary = result.heartLineSummary,
+                        headLineSummary = result.headLineSummary,
+                        fateAndMounts = result.fateAndMounts,
+                        remedies = result.remedies
+                    )
+                    _localPalmReadings.value = listOf(localPalm) + _localPalmReadings.value
+                }
                 _statusBanner.value = "Hastrekha ($handSide) analysis saved to your profile"
             } catch (e: TimeoutCancellationException) {
                 Log.e(TAG, "Palm reading timed out", e)
@@ -687,7 +797,11 @@ class AstrologyViewModel(
 
     fun deletePalmReading(readingId: String) {
         viewModelScope.launch {
-            repository.deletePalmReading(readingId)
+            if (isCloudUser) {
+                repository.deletePalmReading(readingId)
+            } else {
+                _localPalmReadings.value = _localPalmReadings.value.filterNot { it.id == readingId }
+            }
         }
     }
 

@@ -51,6 +51,9 @@ import com.google.firebase.auth.FirebaseUser
 @Composable
 fun SettingsAndProfileScreen(
     currentUser: FirebaseUser?,
+    userDisplayName: String = currentUser?.displayName ?: "JevanMantra Seeker",
+    userEmailOrPhone: String = currentUser?.email ?: "Vedic Profile Account",
+    isGoogleAccount: Boolean = currentUser != null,
     preferences: UserPreferences,
     onToggleDarkMode: (Boolean) -> Unit,
     onUpdateNotifications: (Boolean, Int, Int) -> Unit,
@@ -85,7 +88,7 @@ fun SettingsAndProfileScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Authenticated Google Profile Card
+        // 1. Authenticated User Profile Card (Manual or Google)
         item {
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -106,12 +109,16 @@ fun SettingsAndProfileScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = currentUser?.displayName ?: "JevanMantra Seeker",
+                                text = userDisplayName,
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = currentUser?.email ?: "Signed in with Google",
+                                text = if (isGoogleAccount) {
+                                    "$userEmailOrPhone • Google Cloud Sync"
+                                } else {
+                                    "$userEmailOrPhone • JevanMantra Account"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -130,7 +137,7 @@ fun SettingsAndProfileScreen(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sign Out of Google Account")
+                        Text("Sign Out")
                     }
                 }
             }
