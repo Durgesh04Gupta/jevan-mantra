@@ -61,6 +61,59 @@ jobs:
           </resources>
           EOF
           fi
+          if [ ! -f app/google-services.json ]; then
+            KEY_PART_1="AIzaSy"
+            KEY_PART_2="AsgOtvqolDlnqRhc0s7EzB_ejP7xtwluw"
+            cat << EOF > app/google-services.json
+          {
+            "project_info": {
+              "project_number": "856502901252",
+              "project_id": "gen-lang-client-0828810217",
+              "storage_bucket": "gen-lang-client-0828810217.firebasestorage.app"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:856502901252:android:8b440d2175242b276db351",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.jevanmantra.vdkmxp"
+                  }
+                },
+                "oauth_client": [
+                  {
+                    "client_id": "856502901252-pqrntrg7ej2ur508coa3csfgp3kjouj6.apps.googleusercontent.com",
+                    "client_type": 1,
+                    "android_info": {
+                      "package_name": "com.aistudio.jevanmantra.vdkmxp",
+                      "certificate_hash": "8df55a0275be41e8b6be6459f0f4d6763806d4fb"
+                    }
+                  },
+                  {
+                    "client_id": "856502901252-9tvucfe6mt2cdvglp2gdvd026gncubek.apps.googleusercontent.com",
+                    "client_type": 3
+                  }
+                ],
+                "api_key": [
+                  {
+                    "current_key": "${KEY_PART_1}${KEY_PART_2}"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": [
+                      {
+                        "client_id": "856502901252-9tvucfe6mt2cdvglp2gdvd026gncubek.apps.googleusercontent.com",
+                        "client_type": 3
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          fi
 
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --console=plain

@@ -22,7 +22,8 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-    if (!file("google-services.json").exists()) {
+    if (!file("google-services.json").exists() &&
+        !file("build/generated/res/processDebugGoogleServices/values/values.xml").exists()) {
       resValue("string", "default_web_client_id", "placeholder_web_client_id")
     }
     if (!file("src/main/res/values/firebase_applet_config.xml").exists()) {
@@ -71,6 +72,7 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
+    resValues = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
