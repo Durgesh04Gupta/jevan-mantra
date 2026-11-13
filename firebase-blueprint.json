@@ -1,0 +1,207 @@
+{
+  "entities": {
+    "KundaliProfile": {
+      "title": "KundaliProfile",
+      "description": "Saved Vedic Janam Kundali birth chart and AI planetary analysis for a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated Google user."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the person for this Kundali."
+        },
+        "birthDate": {
+          "type": "string",
+          "description": "Date of birth (YYYY-MM-DD)."
+        },
+        "birthTime": {
+          "type": "string",
+          "description": "Time of birth (HH:MM)."
+        },
+        "birthPlace": {
+          "type": "string",
+          "description": "City and state/country of birth."
+        },
+        "rashi": {
+          "type": "string",
+          "description": "Calculated Moon sign (Janam Rashi)."
+        },
+        "nakshatra": {
+          "type": "string",
+          "description": "Calculated birth star (Nakshatra and Pada)."
+        },
+        "lagna": {
+          "type": "string",
+          "description": "Ascendant sign (Lagna)."
+        },
+        "aiSummary": {
+          "type": "string",
+          "description": "AI-generated Vedic Kundali reading and planetary Yoga analysis."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the Kundali was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the Kundali was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "birthDate",
+        "birthTime",
+        "birthPlace",
+        "rashi",
+        "nakshatra",
+        "lagna",
+        "aiSummary",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MilanReport": {
+      "title": "MilanReport",
+      "description": "Ashta-Koota 36 Guna Kundli Milan marriage compatibility report.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated Google user."
+        },
+        "boyName": {
+          "type": "string",
+          "description": "Name of Partner 1 (Var)."
+        },
+        "boyDetails": {
+          "type": "string",
+          "description": "Birth date, time, place, and Rashi/Nakshatra of Partner 1."
+        },
+        "girlName": {
+          "type": "string",
+          "description": "Name of Partner 2 (Kanya)."
+        },
+        "girlDetails": {
+          "type": "string",
+          "description": "Birth date, time, place, and Rashi/Nakshatra of Partner 2."
+        },
+        "totalGuna": {
+          "type": "integer",
+          "description": "Ashta-Koota Guna score out of 36."
+        },
+        "compatibilityVerdict": {
+          "type": "string",
+          "description": "Summary compatibility verdict and Mangal Dosha note."
+        },
+        "aiAnalysis": {
+          "type": "string",
+          "description": "Detailed AI Kundli Milan breakdown and remedies."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the report was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the report was updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "boyName",
+        "boyDetails",
+        "girlName",
+        "girlDetails",
+        "totalGuna",
+        "compatibilityVerdict",
+        "aiAnalysis",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PalmReading": {
+      "title": "PalmReading",
+      "description": "AI Samudrika Shastra palm reading analysis report.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated Google user."
+        },
+        "handSide": {
+          "type": "string",
+          "description": "Analyzed hand side (Right Hand or Left Hand)."
+        },
+        "lifeLineSummary": {
+          "type": "string",
+          "description": "Jeevan Rekha (Life Line) analysis."
+        },
+        "heartLineSummary": {
+          "type": "string",
+          "description": "Hridaya Rekha (Heart Line) analysis."
+        },
+        "headLineSummary": {
+          "type": "string",
+          "description": "Mastishka Rekha (Head Line) analysis."
+        },
+        "fateAndMounts": {
+          "type": "string",
+          "description": "Bhagya Rekha (Fate Line) and planetary mounts analysis."
+        },
+        "remedies": {
+          "type": "string",
+          "description": "Personalized Vedic mantras and remedies."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the reading was saved (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the reading was updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "handSide",
+        "lifeLineSummary",
+        "heartLineSummary",
+        "headLineSummary",
+        "fateAndMounts",
+        "remedies",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/kundalis/{kundaliId}": {
+      "schema": {
+        "$ref": "#/entities/KundaliProfile"
+      },
+      "description": "User-scoped collection of saved Vedic Kundali birth charts."
+    },
+    "/users/{userId}/milan_reports/{reportId}": {
+      "schema": {
+        "$ref": "#/entities/MilanReport"
+      },
+      "description": "User-scoped collection of saved Kundli Milan compatibility reports."
+    },
+    "/users/{userId}/palm_readings/{readingId}": {
+      "schema": {
+        "$ref": "#/entities/PalmReading"
+      },
+      "description": "User-scoped collection of saved AI palm reading reports."
+    }
+  }
+}

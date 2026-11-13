@@ -1,0 +1,171 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity 1: KundaliProfile validation
+    function isValidKundaliProfile(data, userId) {
+      return data.userId is string && data.userId == userId && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.birthDate is string && data.birthDate.size() >= 1 && data.birthDate.size() <= 30 &&
+             data.birthTime is string && data.birthTime.size() >= 1 && data.birthTime.size() <= 20 &&
+             data.birthPlace is string && data.birthPlace.size() >= 1 && data.birthPlace.size() <= 120 &&
+             data.rashi is string && data.rashi.size() >= 1 && data.rashi.size() <= 40 &&
+             data.nakshatra is string && data.nakshatra.size() >= 1 && data.nakshatra.size() <= 50 &&
+             data.lagna is string && data.lagna.size() >= 1 && data.lagna.size() <= 40 &&
+             data.aiSummary is string && data.aiSummary.size() <= 8000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Entity 2: MilanReport validation
+    function isValidMilanReport(data, userId) {
+      return data.userId is string && data.userId == userId && data.userId == request.auth.uid &&
+             data.boyName is string && data.boyName.size() >= 1 && data.boyName.size() <= 80 &&
+             data.boyDetails is string && data.boyDetails.size() >= 1 && data.boyDetails.size() <= 160 &&
+             data.girlName is string && data.girlName.size() >= 1 && data.girlName.size() <= 80 &&
+             data.girlDetails is string && data.girlDetails.size() >= 1 && data.girlDetails.size() <= 160 &&
+             data.totalGuna is int && data.totalGuna >= 0 && data.totalGuna <= 36 &&
+             data.compatibilityVerdict is string && data.compatibilityVerdict.size() >= 1 && data.compatibilityVerdict.size() <= 120 &&
+             data.aiAnalysis is string && data.aiAnalysis.size() >= 1 && data.aiAnalysis.size() <= 8000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Entity 3: PalmReading validation
+    function isValidPalmReading(data, userId) {
+      return data.userId is string && data.userId == userId && data.userId == request.auth.uid &&
+             data.handSide is string && data.handSide.size() >= 1 && data.handSide.size() <= 40 &&
+             data.lifeLineSummary is string && data.lifeLineSummary.size() >= 1 && data.lifeLineSummary.size() <= 2000 &&
+             data.heartLineSummary is string && data.heartLineSummary.size() >= 1 && data.heartLineSummary.size() <= 2000 &&
+             data.headLineSummary is string && data.headLineSummary.size() >= 1 && data.headLineSummary.size() <= 2000 &&
+             data.fateAndMounts is string && data.fateAndMounts.size() >= 1 && data.fateAndMounts.size() <= 4000 &&
+             data.remedies is string && data.remedies.size() >= 1 && data.remedies.size() <= 2000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      // 1. Saved Kundalis
+      match /kundalis/{kundaliId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(kundaliId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(kundaliId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'name', 'birthDate', 'birthTime', 'birthPlace',
+                           'rashi', 'nakshatra', 'lagna', 'aiSummary', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'name', 'birthDate', 'birthTime', 'birthPlace',
+                           'rashi', 'nakshatra', 'lagna', 'aiSummary', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidKundaliProfile(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(kundaliId) &&
+                         isValidKundaliProfile(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'name', 'birthDate', 'birthTime', 'birthPlace',
+                           'rashi', 'nakshatra', 'lagna', 'aiSummary', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(kundaliId);
+      }
+
+      // 2. Saved Kundli Milan Reports
+      match /milan_reports/{reportId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(reportId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(reportId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'boyName', 'boyDetails', 'girlName', 'girlDetails',
+                           'totalGuna', 'compatibilityVerdict', 'aiAnalysis', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'boyName', 'boyDetails', 'girlName', 'girlDetails',
+                           'totalGuna', 'compatibilityVerdict', 'aiAnalysis', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidMilanReport(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(reportId) &&
+                         isValidMilanReport(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'boyName', 'boyDetails', 'girlName', 'girlDetails',
+                           'totalGuna', 'compatibilityVerdict', 'aiAnalysis', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(reportId);
+      }
+
+      // 3. Saved Palm Readings
+      match /palm_readings/{readingId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(readingId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(readingId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'handSide', 'lifeLineSummary', 'heartLineSummary',
+                           'headLineSummary', 'fateAndMounts', 'remedies', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'handSide', 'lifeLineSummary', 'heartLineSummary',
+                           'headLineSummary', 'fateAndMounts', 'remedies', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidPalmReading(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(readingId) &&
+                         isValidPalmReading(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'handSide', 'lifeLineSummary', 'heartLineSummary',
+                           'headLineSummary', 'fateAndMounts', 'remedies', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(readingId);
+      }
+    }
+  }
+}

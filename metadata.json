@@ -1,0 +1,6 @@
+{
+  "name": "JevanMantra",
+  "description": "Vedic astrology app with AI Kundali analysis & Q&A, Kundli Milan, palm reading hand analysis, and daily horoscopes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

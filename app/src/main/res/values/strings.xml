@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">JevanMantra</string>
+    <string name="tagline">Vedic Astrology • Kundali • Palmistry • AI Jyotish</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="nav_home">Rashifal</string>
+    <string name="nav_kundali">Kundali &amp; AI</string>
+    <string name="nav_milan">Kundli Milan</string>
+    <string name="nav_palm">Hastrekha</string>
+    <string name="nav_profile">Settings</string>
+</resources>
