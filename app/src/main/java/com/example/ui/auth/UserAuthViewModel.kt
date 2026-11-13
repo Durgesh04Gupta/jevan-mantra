@@ -311,11 +311,11 @@ class UserAuthViewModel(
     ) {
         val cleanName = name.ifBlank { "JevanMantra Seeker" }
         val cleanDate = birthDate.ifBlank { "1998-05-14" }
-        val cleanTime = birthTime.ifBlank { "10:30" }
-        val cleanPlace = birthPlace.ifBlank { "New Delhi, India" }
+        val cleanTime = VedicAstrologyEngine.parseTimeWithAmPm(birthTime.ifBlank { "10:30 AM" }).formatted12Hr
+        val cleanPlace = birthPlace.ifBlank { "New Delhi, DL (28.61°N, 77.21°E)" }
         val chart = VedicAstrologyEngine.calculateKundaliChart(cleanName, cleanDate, cleanTime, cleanPlace)
         val summary = aiSummary.ifBlank {
-            "Lagna: ${chart.lagna}, Rashi: ${chart.rashi}, Nakshatra: ${chart.nakshatra}, Dasha: ${chart.vimshottariDasha}"
+            "Lagna: ${chart.lagna}, Rashi: ${chart.rashi}, Nakshatra: ${chart.nakshatra}, Time: ${chart.formattedBirthTime}, Coords: ${chart.coordinatesLabel} (${chart.lmtOffsetLabel})"
         }
 
         viewModelScope.launch {

@@ -174,7 +174,7 @@ class AstrologyViewModel(
 
     // --- KUNDALI CHART & AI ANALYSIS STATE ---
     private val _activeKundaliChart = MutableStateFlow(
-        VedicAstrologyEngine.calculateKundaliChart("Aarav Sharma", "1998-05-14", "10:30", "Varanasi, UP")
+        VedicAstrologyEngine.calculateKundaliChart("Aarav Sharma", "1998-05-14", "10:30 AM", "Varanasi, UP (25.32°N, 83.00°E)")
     )
     val activeKundaliChart: StateFlow<CalculatedKundaliChart> = _activeKundaliChart.asStateFlow()
 
@@ -182,8 +182,8 @@ class AstrologyViewModel(
         KundaliProfile(
             name = "Aarav Sharma",
             birthDate = "1998-05-14",
-            birthTime = "10:30",
-            birthPlace = "Varanasi, UP"
+            birthTime = "10:30 AM",
+            birthPlace = "Varanasi, UP (25.32°N, 83.00°E)"
         )
     )
     val activeKundaliMeta: StateFlow<KundaliProfile> = _activeKundaliMeta.asStateFlow()
@@ -359,8 +359,8 @@ class AstrologyViewModel(
     ) {
         val cleanName = name.ifBlank { "JevanMantra Seeker" }
         val cleanDate = birthDate.ifBlank { "1998-05-14" }
-        val cleanTime = birthTime.ifBlank { "10:30" }
-        val cleanPlace = birthPlace.ifBlank { "New Delhi, India" }
+        val cleanTime = VedicAstrologyEngine.parseTimeWithAmPm(birthTime.ifBlank { "10:30 AM" }).formatted12Hr
+        val cleanPlace = birthPlace.ifBlank { "New Delhi, DL (28.61°N, 77.21°E)" }
 
         val chart = VedicAstrologyEngine.calculateKundaliChart(cleanName, cleanDate, cleanTime, cleanPlace)
         _activeKundaliChart.value = chart
@@ -383,8 +383,8 @@ class AstrologyViewModel(
             You are a revered Vedic Jyotish Acharya on JevanMantra.
             Analyze this Janam Kundali birth chart in clear, warm English with authentic Sanskrit astrological terms (Hinglish/Vedic friendly):
             - Native Name: $cleanName
-            - Date & Time of Birth: $cleanDate at $cleanTime
-            - Place of Birth: $cleanPlace
+            - Date & Exact Time of Birth: $cleanDate at ${chart.formattedBirthTime} (${chart.lmtOffsetLabel})
+            - Place & Map Coordinates: $cleanPlace [${chart.coordinatesLabel}]
             - Lagna (Ascendant): ${chart.lagna}
             - Janam Rashi (Moon Sign): ${chart.rashi}
             - Janam Nakshatra: ${chart.nakshatra}

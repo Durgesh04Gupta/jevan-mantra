@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.GunaKootaScore
 import com.example.data.model.MilanReport
 import com.example.domain.CalculatedMilanResult
+import com.example.ui.components.BirthPlaceMapField
+import com.example.ui.components.BirthTimeAmPmField
 import com.example.ui.viewmodel.AiGenerationState
 import com.example.ui.viewmodel.DataListState
 
@@ -57,13 +59,13 @@ fun KundliMilanScreen(
 ) {
     var boyName by rememberSaveable { mutableStateOf("Rohan Verma") }
     var boyDate by rememberSaveable { mutableStateOf("1996-04-18") }
-    var boyTime by rememberSaveable { mutableStateOf("09:15") }
-    var boyPlace by rememberSaveable { mutableStateOf("Jaipur, RJ") }
+    var boyTime by rememberSaveable { mutableStateOf("09:15 AM") }
+    var boyPlace by rememberSaveable { mutableStateOf("Jaipur, RJ (26.91°N, 75.79°E)") }
 
     var girlName by rememberSaveable { mutableStateOf("Priya Nair") }
     var girlDate by rememberSaveable { mutableStateOf("1998-09-24") }
-    var girlTime by rememberSaveable { mutableStateOf("16:40") }
-    var girlPlace by rememberSaveable { mutableStateOf("Pune, MH") }
+    var girlTime by rememberSaveable { mutableStateOf("04:40 PM") }
+    var girlPlace by rememberSaveable { mutableStateOf("Pune, MH (18.52°N, 73.86°E)") }
 
     LazyColumn(
         modifier = modifier
@@ -99,38 +101,38 @@ fun KundliMilanScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.secondary
                     )
-                    OutlinedTextField(
-                        value = boyName,
-                        onValueChange = { boyName = it },
-                        label = { Text("Partner 1 Name") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("milan_boy_name_input")
-                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = boyName,
+                            onValueChange = { boyName = it },
+                            label = { Text("Partner 1 Name") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .testTag("milan_boy_name_input")
+                        )
                         OutlinedTextField(
                             value = boyDate,
                             onValueChange = { boyDate = it },
                             label = { Text("DOB (YYYY-MM-DD)") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = boyTime,
-                            onValueChange = { boyTime = it },
-                            label = { Text("Time (HH:MM)") },
-                            singleLine = true,
-                            modifier = Modifier.weight(0.8f)
-                        )
-                        OutlinedTextField(
-                            value = boyPlace,
-                            onValueChange = { boyPlace = it },
-                            label = { Text("City") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("milan_boy_date_input")
                         )
                     }
+                    BirthTimeAmPmField(
+                        timeValue = boyTime,
+                        onTimeChange = { boyTime = it },
+                        label = "Partner 1 Time (HH:MM)",
+                        inputTestTag = "milan_boy_time_input"
+                    )
+                    BirthPlaceMapField(
+                        placeValue = boyPlace,
+                        onPlaceChange = { boyPlace = it },
+                        label = "Partner 1 Birth City & Map Pin",
+                        inputTestTag = "milan_boy_place_input"
+                    )
 
                     Spacer(modifier = Modifier.height(4.dp))
 
@@ -141,38 +143,38 @@ fun KundliMilanScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.secondary
                     )
-                    OutlinedTextField(
-                        value = girlName,
-                        onValueChange = { girlName = it },
-                        label = { Text("Partner 2 Name") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("milan_girl_name_input")
-                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = girlName,
+                            onValueChange = { girlName = it },
+                            label = { Text("Partner 2 Name") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .testTag("milan_girl_name_input")
+                        )
                         OutlinedTextField(
                             value = girlDate,
                             onValueChange = { girlDate = it },
                             label = { Text("DOB (YYYY-MM-DD)") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = girlTime,
-                            onValueChange = { girlTime = it },
-                            label = { Text("Time (HH:MM)") },
-                            singleLine = true,
-                            modifier = Modifier.weight(0.8f)
-                        )
-                        OutlinedTextField(
-                            value = girlPlace,
-                            onValueChange = { girlPlace = it },
-                            label = { Text("City") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("milan_girl_date_input")
                         )
                     }
+                    BirthTimeAmPmField(
+                        timeValue = girlTime,
+                        onTimeChange = { girlTime = it },
+                        label = "Partner 2 Time (HH:MM)",
+                        inputTestTag = "milan_girl_time_input"
+                    )
+                    BirthPlaceMapField(
+                        placeValue = girlPlace,
+                        onPlaceChange = { girlPlace = it },
+                        label = "Partner 2 Birth City & Map Pin",
+                        inputTestTag = "milan_girl_place_input"
+                    )
 
                     Button(
                         onClick = {

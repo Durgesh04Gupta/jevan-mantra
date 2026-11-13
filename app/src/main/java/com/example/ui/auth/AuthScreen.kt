@@ -77,6 +77,8 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
+import com.example.ui.components.BirthPlaceMapField
+import com.example.ui.components.BirthTimeAmPmField
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -224,8 +226,8 @@ fun AuthScreen(
     var selectedAuthTab by rememberSaveable { mutableIntStateOf(0) }
     var regFullName by rememberSaveable { mutableStateOf("") }
     var regBirthDate by rememberSaveable { mutableStateOf("1998-05-14") }
-    var regBirthTime by rememberSaveable { mutableStateOf("10:30") }
-    var regBirthPlace by rememberSaveable { mutableStateOf("Varanasi, UP") }
+    var regBirthTime by rememberSaveable { mutableStateOf("10:30 AM") }
+    var regBirthPlace by rememberSaveable { mutableStateOf("Varanasi, UP (25.32°N, 83.00°E)") }
 
     val isLoading = authState is UserAuthUiState.Loading
     val errorMessage = (authState as? UserAuthUiState.Error)?.message
@@ -504,38 +506,28 @@ fun AuthScreen(
                                     .testTag("register_name_input")
                             )
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = regBirthDate,
-                                    onValueChange = { regBirthDate = it },
-                                    label = { Text("Birth Date (YYYY-MM-DD)") },
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("register_dob_input")
-                                )
-                                OutlinedTextField(
-                                    value = regBirthTime,
-                                    onValueChange = { regBirthTime = it },
-                                    label = { Text("Birth Time (HH:MM)") },
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .weight(0.9f)
-                                        .testTag("register_tob_input")
-                                )
-                            }
-
                             OutlinedTextField(
-                                value = regBirthPlace,
-                                onValueChange = { regBirthPlace = it },
-                                label = { Text("Birth City & State (e.g., Varanasi, UP)") },
+                                value = regBirthDate,
+                                onValueChange = { regBirthDate = it },
+                                label = { Text("Birth Date (YYYY-MM-DD)") },
                                 singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("register_place_input")
+                                    .testTag("register_dob_input")
+                            )
+
+                            BirthTimeAmPmField(
+                                timeValue = regBirthTime,
+                                onTimeChange = { regBirthTime = it },
+                                label = "Birth Time (HH:MM)",
+                                inputTestTag = "register_tob_input"
+                            )
+
+                            BirthPlaceMapField(
+                                placeValue = regBirthPlace,
+                                onPlaceChange = { regBirthPlace = it },
+                                label = "Birth City & Map Coordinates",
+                                inputTestTag = "register_place_input"
                             )
 
                             Button(

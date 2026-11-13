@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import com.example.data.model.ChatMessage
 import com.example.data.model.KundaliProfile
 import com.example.domain.CalculatedKundaliChart
+import com.example.ui.components.BirthPlaceMapField
+import com.example.ui.components.BirthTimeAmPmField
 import com.example.ui.components.NorthIndianKundaliChart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.example.ui.viewmodel.AiGenerationState
@@ -129,37 +131,26 @@ fun KundaliAndQaScreen(
                                     .fillMaxWidth()
                                     .testTag("kundali_name_input")
                             )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = dateInput,
-                                    onValueChange = { dateInput = it },
-                                    label = { Text("Birth Date (YYYY-MM-DD)") },
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("kundali_date_input")
-                                )
-                                OutlinedTextField(
-                                    value = timeInput,
-                                    onValueChange = { timeInput = it },
-                                    label = { Text("Birth Time (HH:MM)") },
-                                    singleLine = true,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("kundali_time_input")
-                                )
-                            }
                             OutlinedTextField(
-                                value = placeInput,
-                                onValueChange = { placeInput = it },
-                                label = { Text("Place of Birth (City, State)") },
+                                value = dateInput,
+                                onValueChange = { dateInput = it },
+                                label = { Text("Birth Date (YYYY-MM-DD)") },
                                 singleLine = true,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("kundali_place_input")
+                                    .testTag("kundali_date_input")
+                            )
+                            BirthTimeAmPmField(
+                                timeValue = timeInput,
+                                onTimeChange = { timeInput = it },
+                                label = "Birth Time (HH:MM)",
+                                inputTestTag = "kundali_time_input"
+                            )
+                            BirthPlaceMapField(
+                                placeValue = placeInput,
+                                onPlaceChange = { placeInput = it },
+                                label = "Place of Birth (City & Map Pin)",
+                                inputTestTag = "kundali_place_input"
                             )
                             Button(
                                 onClick = {
@@ -198,6 +189,12 @@ fun KundaliAndQaScreen(
                                 text = "${activeChart.lagna} Lagna • ${activeChart.rashi} Rashi • ${activeChart.nakshatra}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Birth: ${activeChart.formattedBirthTime} • Geo: ${activeChart.coordinatesLabel} (${activeChart.lmtOffsetLabel})",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(12.dp))
 
