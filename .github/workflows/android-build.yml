@@ -37,7 +37,7 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Prepare .env and debug.keystore
+      - name: Prepare .env, Firebase config, and debug.keystore
         run: |
           if [ ! -f .env ]; then
             if [ -f .env.example ]; then
@@ -51,9 +51,19 @@ jobs:
           elif [ ! -f debug.keystore ]; then
             keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
           fi
+          if [ ! -f app/src/main/res/values/firebase_applet_config.xml ]; then
+            mkdir -p app/src/main/res/values
+            cat << 'EOF' > app/src/main/res/values/firebase_applet_config.xml
+          <?xml version="1.0" encoding="utf-8" standalone="no"?>
+          <resources>
+              <string name="firestore_database_id" translatable="false">ai-studio-android-jevanman-f9e8af8c-b212-450b-911c-7685310900bb</string>
+              <string name="recaptcha_site_key" translatable="false">6LeYuRwuAAAAAOLnkxe5LEIRW-XsnNSaRRZiRl2a</string>
+          </resources>
+          EOF
+          fi
 
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --console=plain
 
       - name: Upload JevanMantra APK Artifact
         uses: actions/upload-artifact@v4
