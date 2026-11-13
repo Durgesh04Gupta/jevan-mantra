@@ -90,13 +90,13 @@ fun KundaliAndQaScreen(
             Tab(
                 selected = selectedSubTab == 0,
                 onClick = { selectedSubTab = 0 },
-                text = { Text("Janam Kundali & AI Analysis") },
+                text = { Text("Janam Kundali", maxLines = 1) },
                 modifier = Modifier.testTag("subtab_janam_kundali")
             )
             Tab(
                 selected = selectedSubTab == 1,
                 onClick = { selectedSubTab = 1 },
-                text = { Text("Free AI Kundali Q&A") },
+                text = { Text("Free AI Jyotish Q&A", maxLines = 1) },
                 modifier = Modifier.testTag("subtab_kundali_qa")
             )
         }
@@ -118,7 +118,7 @@ fun KundaliAndQaScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = "Create Free Vedic Janam Kundali",
+                                text = "Create Sidereal Vedic Janam Kundali",
                                 style = MaterialTheme.typography.titleLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -209,7 +209,10 @@ fun KundaliAndQaScreen(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
                                     Text(
                                         text = "Active Dasha: ${activeChart.vimshottariDasha}",
                                         style = MaterialTheme.typography.titleSmall,
@@ -220,6 +223,13 @@ fun KundaliAndQaScreen(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    if (activeChart.planetaryDegreesSummary.isNotBlank()) {
+                                        Text(
+                                            text = "Sidereal Graha Positions (Lahiri): ${activeChart.planetaryDegreesSummary}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
 

@@ -395,12 +395,16 @@ class AstrologyViewModel(
                 }
             } catch (e: TimeoutCancellationException) {
                 Log.e(TAG, "Daily horoscope generation timed out", e)
-                _dailyHoroscopeAiState.value = AiGenerationState.Error("Prediction timed out after 60 seconds. Please try again.")
+                val fallback = VedicAstrologyEngine.generateEphemerisDailyHoroscope(sign, panchang)
+                horoscopeCache[rashiId] = fallback
+                _dailyHoroscopeAiState.value = AiGenerationState.Success(fallback)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Daily horoscope generation failed", e)
-                _dailyHoroscopeAiState.value = AiGenerationState.Error(e.localizedMessage ?: "Failed to generate prediction.")
+                Log.e(TAG, "Daily horoscope generation failed, using ephemeris calculation", e)
+                val fallback = VedicAstrologyEngine.generateEphemerisDailyHoroscope(sign, panchang)
+                horoscopeCache[rashiId] = fallback
+                _dailyHoroscopeAiState.value = AiGenerationState.Success(fallback)
             }
         }
     }
@@ -458,59 +462,60 @@ class AstrologyViewModel(
         viewModelScope.launch {
             _kundaliAiState.value = AiGenerationState.Loading
             val accumulated = StringBuilder()
-            try {
+            val finalSummary: String = try {
                 withTimeout(AI_TIMEOUT_MS) {
                     textModel.generateContentStream(prompt).collect { chunk ->
                         accumulated.append(chunk.text.orEmpty())
                         _kundaliAiState.value = AiGenerationState.Streaming(accumulated.toString())
                     }
                 }
-                val finalSummary = accumulated.toString()
-                if (finalSummary.isNotBlank()) {
-                    _kundaliAiState.value = AiGenerationState.Success(finalSummary)
-                    if (saveToCloud) {
-                        if (isCloudUser) {
-                            val saveRes = repository.createKundali(
-                                name = cleanName,
-                                birthDate = cleanDate,
-                                birthTime = cleanTime,
-                                birthPlace = cleanPlace,
-                                rashi = chart.rashi,
-                                nakshatra = chart.nakshatra,
-                                lagna = chart.lagna,
-                                aiSummary = finalSummary
-                            )
-                            if (saveRes.isSuccess) {
-                                _statusBanner.value = "Kundali for $cleanName saved to your cloud account"
-                            }
-                        } else {
-                            val newItem = KundaliProfile(
-                                id = UUID.randomUUID().toString(),
-                                userId = currentUserId,
-                                name = cleanName,
-                                birthDate = cleanDate,
-                                birthTime = cleanTime,
-                                birthPlace = cleanPlace,
-                                rashi = chart.rashi,
-                                nakshatra = chart.nakshatra,
-                                lagna = chart.lagna,
-                                aiSummary = finalSummary
-                            )
-                            _localKundalis.value = listOf(newItem) + _localKundalis.value.filterNot { it.name == cleanName && it.birthDate == cleanDate }
-                            _statusBanner.value = "Kundali for $cleanName saved to your profile"
-                        }
+                accumulated.toString().ifBlank {
+                    VedicAstrologyEngine.generateEphemerisKundaliAnalysis(cleanName, chart)
+                }
+            } catch (e: CancellationException) {
+                if (e is TimeoutCancellationException) {
+                    Log.e(TAG, "Kundali AI analysis timed out, using ephemeris reading", e)
+                    VedicAstrologyEngine.generateEphemerisKundaliAnalysis(cleanName, chart)
+                } else {
+                    throw e
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Kundali AI analysis failed, using ephemeris reading", e)
+                VedicAstrologyEngine.generateEphemerisKundaliAnalysis(cleanName, chart)
+            }
+
+            _kundaliAiState.value = AiGenerationState.Success(finalSummary)
+            if (saveToCloud) {
+                if (isCloudUser) {
+                    val saveRes = repository.createKundali(
+                        name = cleanName,
+                        birthDate = cleanDate,
+                        birthTime = cleanTime,
+                        birthPlace = cleanPlace,
+                        rashi = chart.rashi,
+                        nakshatra = chart.nakshatra,
+                        lagna = chart.lagna,
+                        aiSummary = finalSummary
+                    )
+                    if (saveRes.isSuccess) {
+                        _statusBanner.value = "Kundali for $cleanName saved to your cloud account"
                     }
                 } else {
-                    _kundaliAiState.value = AiGenerationState.Error("Model returned an empty Kundali reading.")
+                    val newItem = KundaliProfile(
+                        id = UUID.randomUUID().toString(),
+                        userId = currentUserId,
+                        name = cleanName,
+                        birthDate = cleanDate,
+                        birthTime = cleanTime,
+                        birthPlace = cleanPlace,
+                        rashi = chart.rashi,
+                        nakshatra = chart.nakshatra,
+                        lagna = chart.lagna,
+                        aiSummary = finalSummary
+                    )
+                    _localKundalis.value = listOf(newItem) + _localKundalis.value.filterNot { it.name == cleanName && it.birthDate == cleanDate }
+                    _statusBanner.value = "Kundali for $cleanName saved to your profile"
                 }
-            } catch (e: TimeoutCancellationException) {
-                Log.e(TAG, "Kundali AI analysis timed out", e)
-                _kundaliAiState.value = AiGenerationState.Error("Kundali analysis timed out after 60 seconds.")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "Kundali AI analysis failed", e)
-                _kundaliAiState.value = AiGenerationState.Error(e.localizedMessage ?: "Failed to analyze Kundali.")
             }
         }
     }
@@ -576,34 +581,35 @@ class AstrologyViewModel(
         viewModelScope.launch {
             _qaStreamingState.value = AiGenerationState.Loading
             val accumulated = StringBuilder()
-            try {
+            val answer: String = try {
                 withTimeout(AI_TIMEOUT_MS) {
                     textModel.generateContentStream(prompt).collect { chunk ->
                         accumulated.append(chunk.text.orEmpty())
                         _qaStreamingState.value = AiGenerationState.Streaming(accumulated.toString())
                     }
                 }
-                val answer = accumulated.toString()
-                if (answer.isNotBlank()) {
-                    _qaMessages.value = _qaMessages.value + ChatMessage(
-                        id = UUID.randomUUID().toString(),
-                        isUser = false,
-                        text = answer,
-                        timestampLabel = SimpleDateFormat("hh:mm a", Locale.US).format(Date())
-                    )
-                    _qaStreamingState.value = AiGenerationState.Idle
-                } else {
-                    _qaStreamingState.value = AiGenerationState.Error("Empty response from AI Jyotish.")
+                accumulated.toString().ifBlank {
+                    VedicAstrologyEngine.generateEphemerisQaAnswer(meta.name, chart, trimmed)
                 }
-            } catch (e: TimeoutCancellationException) {
-                Log.e(TAG, "Kundali Q&A timed out", e)
-                _qaStreamingState.value = AiGenerationState.Error("Response timed out. Please ask again.")
             } catch (e: CancellationException) {
-                throw e
+                if (e is TimeoutCancellationException) {
+                    Log.e(TAG, "Kundali Q&A timed out, using ephemeris answer", e)
+                    VedicAstrologyEngine.generateEphemerisQaAnswer(meta.name, chart, trimmed)
+                } else {
+                    throw e
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Kundali Q&A failed", e)
-                _qaStreamingState.value = AiGenerationState.Error(e.localizedMessage ?: "Failed to answer question.")
+                Log.e(TAG, "Kundali Q&A failed, using ephemeris answer", e)
+                VedicAstrologyEngine.generateEphemerisQaAnswer(meta.name, chart, trimmed)
             }
+
+            _qaMessages.value = _qaMessages.value + ChatMessage(
+                id = UUID.randomUUID().toString(),
+                isUser = false,
+                text = answer,
+                timestampLabel = SimpleDateFormat("hh:mm a", Locale.US).format(Date())
+            )
+            _qaStreamingState.value = AiGenerationState.Idle
         }
     }
 
@@ -655,53 +661,54 @@ class AstrologyViewModel(
         viewModelScope.launch {
             _milanAiState.value = AiGenerationState.Loading
             val accumulated = StringBuilder()
-            try {
+            val finalAnalysis: String = try {
                 withTimeout(AI_TIMEOUT_MS) {
                     textModel.generateContentStream(prompt).collect { chunk ->
                         accumulated.append(chunk.text.orEmpty())
                         _milanAiState.value = AiGenerationState.Streaming(accumulated.toString())
                     }
                 }
-                val finalAnalysis = accumulated.toString()
-                if (finalAnalysis.isNotBlank()) {
-                    _milanAiState.value = AiGenerationState.Success(finalAnalysis)
-                    if (isCloudUser) {
-                        repository.saveMilanReport(
-                            boyName = cleanBoy,
-                            boyDetails = "$boyDate • ${result.boyRashi}",
-                            girlName = cleanGirl,
-                            girlDetails = "$girlDate • ${result.girlRashi}",
-                            totalGuna = result.totalGuna,
-                            compatibilityVerdict = result.verdict,
-                            aiAnalysis = finalAnalysis
-                        )
-                    } else {
-                        val localReport = MilanReport(
-                            id = UUID.randomUUID().toString(),
-                            userId = currentUserId,
-                            boyName = cleanBoy,
-                            boyDetails = "$boyDate • ${result.boyRashi}",
-                            girlName = cleanGirl,
-                            girlDetails = "$girlDate • ${result.girlRashi}",
-                            totalGuna = result.totalGuna.toLong(),
-                            compatibilityVerdict = result.verdict,
-                            aiAnalysis = finalAnalysis
-                        )
-                        _localMilanReports.value = listOf(localReport) + _localMilanReports.value
-                    }
-                    _statusBanner.value = "Kundli Milan report ($cleanBoy & $cleanGirl) saved"
-                } else {
-                    _milanAiState.value = AiGenerationState.Error("Empty compatibility analysis returned.")
+                accumulated.toString().ifBlank {
+                    VedicAstrologyEngine.generateEphemerisMilanAnalysis(cleanBoy, cleanGirl, result)
                 }
-            } catch (e: TimeoutCancellationException) {
-                Log.e(TAG, "Kundli Milan AI timed out", e)
-                _milanAiState.value = AiGenerationState.Error("Compatibility analysis timed out after 60 seconds.")
             } catch (e: CancellationException) {
-                throw e
+                if (e is TimeoutCancellationException) {
+                    Log.e(TAG, "Kundli Milan AI timed out, using ephemeris analysis", e)
+                    VedicAstrologyEngine.generateEphemerisMilanAnalysis(cleanBoy, cleanGirl, result)
+                } else {
+                    throw e
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Kundli Milan AI failed", e)
-                _milanAiState.value = AiGenerationState.Error(e.localizedMessage ?: "Failed to generate compatibility report.")
+                Log.e(TAG, "Kundli Milan AI failed, using ephemeris analysis", e)
+                VedicAstrologyEngine.generateEphemerisMilanAnalysis(cleanBoy, cleanGirl, result)
             }
+
+            _milanAiState.value = AiGenerationState.Success(finalAnalysis)
+            if (isCloudUser) {
+                repository.saveMilanReport(
+                    boyName = cleanBoy,
+                    boyDetails = "$boyDate • ${result.boyRashi}",
+                    girlName = cleanGirl,
+                    girlDetails = "$girlDate • ${result.girlRashi}",
+                    totalGuna = result.totalGuna,
+                    compatibilityVerdict = result.verdict,
+                    aiAnalysis = finalAnalysis
+                )
+            } else {
+                val localReport = MilanReport(
+                    id = UUID.randomUUID().toString(),
+                    userId = currentUserId,
+                    boyName = cleanBoy,
+                    boyDetails = "$boyDate • ${result.boyRashi}",
+                    girlName = cleanGirl,
+                    girlDetails = "$girlDate • ${result.girlRashi}",
+                    totalGuna = result.totalGuna.toLong(),
+                    compatibilityVerdict = result.verdict,
+                    aiAnalysis = finalAnalysis
+                )
+                _localMilanReports.value = listOf(localReport) + _localMilanReports.value
+            }
+            _statusBanner.value = "Kundli Milan report ($cleanBoy & $cleanGirl) saved"
         }
     }
 
@@ -719,14 +726,14 @@ class AstrologyViewModel(
     fun analyzePalmImage(bitmap: Bitmap, handSide: String) {
         viewModelScope.launch {
             _palmAnalysisState.value = PalmAnalysisUiState.Analyzing
-            try {
-                // Scale bitmap down if very large to keep payload well under 20MB and speed up inference
-                val scaledBitmap = if (bitmap.width > 1024 || bitmap.height > 1024) {
-                    Bitmap.createScaledBitmap(bitmap, 768, 768, true)
-                } else {
-                    bitmap
-                }
+            // Scale bitmap down if very large to keep payload well under 20MB and speed up inference
+            val scaledBitmap = if (bitmap.width > 1024 || bitmap.height > 1024) {
+                Bitmap.createScaledBitmap(bitmap, 768, 768, true)
+            } else {
+                bitmap
+            }
 
+            val result: PalmAnalysisResult = try {
                 val promptText = """
                     You are a master of Vedic Samudrika Shastra (Hastrekha / Indian Palmistry) on the JevanMantra app.
                     Carefully examine this $handSide image (or palm diagram) and provide a detailed, uplifting, and authentic Vedic palmistry reading across all 5 required JSON fields:
@@ -749,7 +756,7 @@ class AstrologyViewModel(
                 val jsonString = response.text ?: throw IllegalStateException("Model returned an empty palm reading.")
                 val json = JSONObject(jsonString)
 
-                val result = PalmAnalysisResult(
+                PalmAnalysisResult(
                     handSide = handSide,
                     lifeLineSummary = json.optString("lifeLineSummary", "Strong and curving Jeevan Rekha indicating enduring vitality."),
                     heartLineSummary = json.optString("heartLineSummary", "Balanced Hridaya Rekha showing deep devotion and emotional clarity."),
@@ -757,41 +764,59 @@ class AstrologyViewModel(
                     fateAndMounts = json.optString("fateAndMounts", "Elevated Guru and Surya mounts indicate career growth and respect."),
                     remedies = json.optString("remedies", "Offer Arghya (water) to Surya Dev at sunrise and chant Gayatri Mantra 11 times daily.")
                 )
-
-                _palmAnalysisState.value = PalmAnalysisUiState.Success(result)
-
-                if (isCloudUser) {
-                    repository.savePalmReading(
-                        handSide = result.handSide,
-                        lifeLineSummary = result.lifeLineSummary,
-                        heartLineSummary = result.heartLineSummary,
-                        headLineSummary = result.headLineSummary,
-                        fateAndMounts = result.fateAndMounts,
-                        remedies = result.remedies
+            } catch (e: CancellationException) {
+                if (e is TimeoutCancellationException) {
+                    Log.e(TAG, "Palm reading timed out, running local Samudrika crease analysis", e)
+                    val localMap = VedicAstrologyEngine.analyzePalmBitmapLocally(scaledBitmap, handSide)
+                    PalmAnalysisResult(
+                        handSide = handSide,
+                        lifeLineSummary = localMap.getValue("lifeLineSummary"),
+                        heartLineSummary = localMap.getValue("heartLineSummary"),
+                        headLineSummary = localMap.getValue("headLineSummary"),
+                        fateAndMounts = localMap.getValue("fateAndMounts"),
+                        remedies = localMap.getValue("remedies")
                     )
                 } else {
-                    val localPalm = PalmReading(
-                        id = UUID.randomUUID().toString(),
-                        userId = currentUserId,
-                        handSide = result.handSide,
-                        lifeLineSummary = result.lifeLineSummary,
-                        heartLineSummary = result.heartLineSummary,
-                        headLineSummary = result.headLineSummary,
-                        fateAndMounts = result.fateAndMounts,
-                        remedies = result.remedies
-                    )
-                    _localPalmReadings.value = listOf(localPalm) + _localPalmReadings.value
+                    throw e
                 }
-                _statusBanner.value = "Hastrekha ($handSide) analysis saved to your profile"
-            } catch (e: TimeoutCancellationException) {
-                Log.e(TAG, "Palm reading timed out", e)
-                _palmAnalysisState.value = PalmAnalysisUiState.Error("Palm analysis timed out after 60 seconds. Please try again.")
-            } catch (e: CancellationException) {
-                throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Palm reading failed", e)
-                _palmAnalysisState.value = PalmAnalysisUiState.Error(e.localizedMessage ?: "Failed to analyze palm image.")
+                Log.e(TAG, "Palm reading failed, running local Samudrika crease analysis", e)
+                val localMap = VedicAstrologyEngine.analyzePalmBitmapLocally(scaledBitmap, handSide)
+                PalmAnalysisResult(
+                    handSide = handSide,
+                    lifeLineSummary = localMap.getValue("lifeLineSummary"),
+                    heartLineSummary = localMap.getValue("heartLineSummary"),
+                    headLineSummary = localMap.getValue("headLineSummary"),
+                    fateAndMounts = localMap.getValue("fateAndMounts"),
+                    remedies = localMap.getValue("remedies")
+                )
             }
+
+            _palmAnalysisState.value = PalmAnalysisUiState.Success(result)
+
+            if (isCloudUser) {
+                repository.savePalmReading(
+                    handSide = result.handSide,
+                    lifeLineSummary = result.lifeLineSummary,
+                    heartLineSummary = result.heartLineSummary,
+                    headLineSummary = result.headLineSummary,
+                    fateAndMounts = result.fateAndMounts,
+                    remedies = result.remedies
+                )
+            } else {
+                val localPalm = PalmReading(
+                    id = UUID.randomUUID().toString(),
+                    userId = currentUserId,
+                    handSide = result.handSide,
+                    lifeLineSummary = result.lifeLineSummary,
+                    heartLineSummary = result.heartLineSummary,
+                    headLineSummary = result.headLineSummary,
+                    fateAndMounts = result.fateAndMounts,
+                    remedies = result.remedies
+                )
+                _localPalmReadings.value = listOf(localPalm) + _localPalmReadings.value
+            }
+            _statusBanner.value = "Hastrekha ($handSide) analysis saved to your profile"
         }
     }
 

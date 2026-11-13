@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,8 +40,6 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -82,6 +79,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -129,7 +127,7 @@ fun BirthTimeAmPmField(
                         .trim()
                     onTimeChange("$clean ${parsed.period}")
                 },
-                label = { Text(label) },
+                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 trailingIcon = {
                     IconButton(
@@ -148,7 +146,7 @@ fun BirthTimeAmPmField(
                     .testTag(inputTestTag)
             )
 
-            // AM / PM Segmented Toggle Buttons (48dp height for touch accessibility)
+            // AM / PM Segmented Toggle Buttons (52dp height for clean alignment)
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
@@ -263,14 +261,16 @@ private fun AmPmPillButton(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
-            color = contentColor
+            color = contentColor,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }
 
 /**
  * Birth Place input integrated with an Interactive Astrological Accuracy Map & GPS Coordinates Picker.
- * Automatically resolves and displays Latitude (°N), Longitude (°E), and Local Mean Time (LMT) correction.
+ * Keeps the text field clean while displaying a crisp single-line Geo Accuracy & LMT pill below.
  */
 @Composable
 fun BirthPlaceMapField(
@@ -282,6 +282,9 @@ fun BirthPlaceMapField(
 ) {
     val resolvedGeo = remember(placeValue) {
         VedicAstrologyEngine.resolveCoordinatesForPlace(placeValue)
+    }
+    val displayTextFieldValue = remember(placeValue) {
+        placeValue.substringBefore("(").trim().ifBlank { resolvedGeo.displayName }
     }
     var showMapDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -295,9 +298,11 @@ fun BirthPlaceMapField(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = placeValue,
-                onValueChange = onPlaceChange,
-                label = { Text(label) },
+                value = displayTextFieldValue,
+                onValueChange = { typedCity ->
+                    onPlaceChange(typedCity)
+                },
+                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 singleLine = true,
                 trailingIcon = {
                     IconButton(
@@ -329,11 +334,11 @@ fun BirthPlaceMapField(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Map", fontWeight = FontWeight.Bold)
+                Text("Map", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             }
         }
 
-        // High-Precision Astrological Coordinates & Local Mean Time (LMT) Badge
+        // Crisp Single-Line Astrological Coordinates & Local Mean Time (LMT) Pill
         Surface(
             shape = RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
@@ -345,11 +350,14 @@ fun BirthPlaceMapField(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Explore,
                         contentDescription = null,
@@ -358,17 +366,22 @@ fun BirthPlaceMapField(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Geo Accuracy: ${resolvedGeo.coordinatesBadge} • ${resolvedGeo.lmtOffsetLabel}",
+                        text = "Geo: ${resolvedGeo.coordinatesBadge} • ${resolvedGeo.lmtOffsetLabel}",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Tap Map to Adjust Pin",
+                    text = "Pin Map ▸",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
@@ -386,12 +399,6 @@ fun BirthPlaceMapField(
     }
 }
 
-/**
- * Full-screen/Modal Interactive Vedic Astrological Map Picker:
- * - Touch/Drag interactive map of India & South Asia (6°N..36°N, 68°E..96°E)
- * - Displays the 82.5°E IST Standard Meridian (Mirzapur) for Local Mean Time (LMT) accuracy
- * - Live GPS location button + Android Geocoder search + 32 Vedic Atlas cities
- */
 @Composable
 fun InteractiveAstroMapDialog(
     initialLocation: AstroLocationPoint,
@@ -443,11 +450,11 @@ fun InteractiveAstroMapDialog(
                     pinLon = gpsPoint.longitude
                     gpsStatusMessage = "GPS locked: ${gpsPoint.formattedWithCoords}"
                 } else {
-                    gpsStatusMessage = "GPS signal unavailable in emulator — tap anywhere on the map to pin exact coordinates."
+                    gpsStatusMessage = "GPS signal unavailable — tap anywhere on the map to pin exact coordinates."
                 }
             }
         } else {
-            gpsStatusMessage = "Location permission declined — you can still tap/drag the map or search any city."
+            gpsStatusMessage = "Location permission declined — tap/drag the map or search any city."
         }
     }
 
@@ -470,7 +477,6 @@ fun InteractiveAstroMapDialog(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -493,7 +499,6 @@ fun InteractiveAstroMapDialog(
                     }
                 }
 
-                // Search bar + Geocoder Lookup + GPS Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -502,7 +507,7 @@ fun InteractiveAstroMapDialog(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search city, district or town...") },
+                        placeholder = { Text("Search city, district or state...") },
                         singleLine = true,
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = null)
@@ -573,7 +578,7 @@ fun InteractiveAstroMapDialog(
                     ) {
                         Icon(Icons.Default.MyLocation, contentDescription = "Use GPS", modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("GPS")
+                        Text("GPS", maxLines = 1, softWrap = false)
                     }
                 }
 
@@ -585,7 +590,6 @@ fun InteractiveAstroMapDialog(
                     )
                 }
 
-                // Quick City Chips
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -610,7 +614,6 @@ fun InteractiveAstroMapDialog(
                     }
                 }
 
-                // INTERACTIVE ASTROLOGICAL MAP CANVAS (Tap or Drag Pin)
                 InteractiveIndiaAstroCanvas(
                     pinLatitude = pinLat,
                     pinLongitude = pinLon,
@@ -618,15 +621,14 @@ fun InteractiveAstroMapDialog(
                     onMapCoordinatePicked = { newLat, newLon ->
                         pinLat = newLat
                         pinLon = newLon
-                        // Snap city label if close to a known Vedic Atlas city, otherwise mark as Custom Map Pin
                         val nearest = VedicAstrologyEngine.vedicCityAtlas.minByOrNull {
                             hypot(it.latitude - newLat, it.longitude - newLon)
                         }
                         if (nearest != null && hypot(nearest.latitude - newLat, nearest.longitude - newLon) <= 1.15) {
                             selectedCityName = nearest.cityName
                             selectedStateName = nearest.stateOrRegion
-                        } else if (!selectedCityName.contains("Map Pin")) {
-                            selectedStateName = "Map Pin"
+                        } else if (!selectedCityName.contains("Pin")) {
+                            selectedStateName = "Custom Pin"
                         }
                     },
                     modifier = Modifier
@@ -635,7 +637,6 @@ fun InteractiveAstroMapDialog(
                         .testTag("astro_map_canvas")
                 )
 
-                // Live Astrological Telemetry Panel (Latitude, Longitude, IST 82.5°E Meridian Offset)
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
@@ -646,7 +647,7 @@ fun InteractiveAstroMapDialog(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "Selected Location: ${currentPoint.formattedWithCoords}",
+                            text = "Selected: ${currentPoint.formattedWithCoords}",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -656,29 +657,28 @@ fun InteractiveAstroMapDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Latitude: ${String.format(Locale.US, "%.2f° N", pinLat)}",
+                                text = "Lat: ${String.format(Locale.US, "%.2f° N", pinLat)}",
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                text = "Longitude: ${String.format(Locale.US, "%.2f° E", pinLon)}",
+                                text = "Lon: ${String.format(Locale.US, "%.2f° E", pinLon)}",
                                 style = MaterialTheme.typography.bodySmall
                             )
                             Text(
-                                text = "Offset: ${currentPoint.lmtOffsetLabel}",
+                                text = currentPoint.lmtOffsetLabel,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.secondary
                             )
                         }
                         Text(
-                            text = "Vedic Lagna & Sunrise are corrected against India Standard Meridian (82.50°E Mirzapur).",
+                            text = "Lagna & Sunrise are computed using Lahiri Ayanamsa & 82.50°E IST Meridian.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -699,7 +699,7 @@ fun InteractiveAstroMapDialog(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Use Exact Coordinates")
+                        Text("Use Coordinates", maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -715,7 +715,6 @@ private fun InteractiveIndiaAstroCanvas(
     onMapCoordinatePicked: (Double, Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Geographic bounds for the interactive map: Lat 6°N..36°N, Lon 66°E..96°E
     val minLat = 6.0
     val maxLat = 36.0
     val minLon = 66.0
@@ -741,7 +740,6 @@ private fun InteractiveIndiaAstroCanvas(
         }
     }
 
-    // Simplified geographic contour of India (Lat, Lon pairs) for visual orientation
     val indiaOutlineLatLon = remember {
         listOf(
             35.5 to 74.5, 34.2 to 77.8, 31.0 to 79.0, 29.5 to 80.2,
@@ -791,7 +789,6 @@ private fun InteractiveIndiaAstroCanvas(
             fun latToY(lat: Double): Float =
                 (((maxLat - lat) / (maxLat - minLat)) * h).toFloat()
 
-            // 1. Latitude & Longitude Graticule Grid
             for (lonStep in 70..95 step 5) {
                 val x = lonToX(lonStep.toDouble())
                 drawLine(
@@ -811,7 +808,6 @@ private fun InteractiveIndiaAstroCanvas(
                 )
             }
 
-            // 2. India Subcontinent Polygon
             val outlinePath = Path().apply {
                 indiaOutlineLatLon.forEachIndexed { idx, (lat, lon) ->
                     val px = lonToX(lon)
@@ -827,7 +823,6 @@ private fun InteractiveIndiaAstroCanvas(
                 style = Stroke(width = 2.2f)
             )
 
-            // 3. IST 82.5°E Standard Meridian (Mirzapur Astrological Reference Line)
             val istX = lonToX(82.5)
             drawLine(
                 color = goldColor.copy(alpha = 0.65f),
@@ -837,13 +832,12 @@ private fun InteractiveIndiaAstroCanvas(
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f), 0f)
             )
             drawContext.canvas.nativeCanvas.drawText(
-                "82.5°E IST Meridian",
+                "82.5°E IST",
                 istX + 6f,
                 26f,
                 labelPaint
             )
 
-            // 4. Vedic Atlas Cities
             VedicAstrologyEngine.vedicCityAtlas.forEach { city ->
                 val cx = lonToX(city.longitude)
                 val cy = latToY(city.latitude)
@@ -854,7 +848,6 @@ private fun InteractiveIndiaAstroCanvas(
                 )
             }
 
-            // 5. Active User Pin Crosshair & Glowing Target
             val pinX = lonToX(pinLongitude.coerceIn(minLon, maxLon))
             val pinY = latToY(pinLatitude.coerceIn(minLat, maxLat))
 
@@ -937,14 +930,12 @@ private suspend fun fetchDeviceGpsLocation(context: Context): AstroLocationPoint
 
 private suspend fun geocodeCityName(context: Context, query: String): AstroLocationPoint? =
     withContext(Dispatchers.IO) {
-        // First check local Vedic City Atlas
         val localMatch = VedicAstrologyEngine.vedicCityAtlas.firstOrNull {
             it.cityName.contains(query, ignoreCase = true) ||
                 query.contains(it.cityName, ignoreCase = true)
         }
         if (localMatch != null) return@withContext localMatch
 
-        // Next try Android Geocoder if available
         try {
             val geocoder = Geocoder(context, Locale.US)
             @Suppress("DEPRECATION")
@@ -961,6 +952,5 @@ private suspend fun geocodeCityName(context: Context, query: String): AstroLocat
         } catch (_: Exception) {
         }
 
-        // Fallback deterministic coordinate resolution
         VedicAstrologyEngine.resolveCoordinatesForPlace(query)
     }
