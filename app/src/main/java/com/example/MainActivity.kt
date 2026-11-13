@@ -253,15 +253,22 @@ private fun JevanMantraMainScaffold(
                 .padding(innerPadding)
         ) {
             when (selectedTab) {
-                0 -> HomeRashifalScreen(
-                    selectedRashiId = preferences.selectedRashiId,
-                    dailyAiState = dailyAiState,
-                    onSelectRashi = viewModel::selectRashi,
-                    onGenerateAiRashifal = viewModel::generatePersonalizedDailyHoroscope,
-                    onNavigateToKundali = { selectedTab = 1 },
-                    onNavigateToMilan = { selectedTab = 2 },
-                    onNavigateToPalm = { selectedTab = 3 }
-                )
+                0 -> {
+                    val primarySavedKundali = (savedKundalis as? com.example.ui.viewmodel.DataListState.Success)?.items?.firstOrNull()
+                    HomeRashifalScreen(
+                        selectedRashiId = preferences.selectedRashiId,
+                        savedKundaliProfile = primarySavedKundali,
+                        dailyAiState = dailyAiState,
+                        onSelectRashi = viewModel::selectRashi,
+                        onEnsureDailyHoroscopeLoaded = viewModel::ensureDailyHoroscopeLoaded,
+                        onRefreshAiRashifal = { rashiId ->
+                            viewModel.generatePersonalizedDailyHoroscope(rashiId, forceRefresh = true)
+                        },
+                        onNavigateToKundali = { selectedTab = 1 },
+                        onNavigateToMilan = { selectedTab = 2 },
+                        onNavigateToPalm = { selectedTab = 3 }
+                    )
+                }
                 1 -> KundaliAndQaScreen(
                     activeChart = activeChart,
                     activeMeta = activeMeta,

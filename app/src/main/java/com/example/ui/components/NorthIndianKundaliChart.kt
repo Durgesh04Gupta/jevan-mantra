@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
@@ -34,6 +34,34 @@ fun NorthIndianKundaliChart(
     val planetTextColor = MaterialTheme.colorScheme.onSurface
     val houseNumColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
 
+    val rashiPaint = remember(houseNumColor) {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(
+                (houseNumColor.alpha * 255).toInt(),
+                (houseNumColor.red * 255).toInt(),
+                (houseNumColor.green * 255).toInt(),
+                (houseNumColor.blue * 255).toInt()
+            )
+            textAlign = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+    }
+
+    val planetPaint = remember(planetTextColor) {
+        android.graphics.Paint().apply {
+            isAntiAlias = true
+            color = android.graphics.Color.argb(
+                (planetTextColor.alpha * 255).toInt(),
+                (planetTextColor.red * 255).toInt(),
+                (planetTextColor.green * 255).toInt(),
+                (planetTextColor.blue * 255).toInt()
+            )
+            textAlign = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -48,14 +76,10 @@ fun NorthIndianKundaliChart(
             val h = size.height
             val stroke = Stroke(width = 3.5f)
 
-            // Outer rectangle
             drawRect(color = lineColor, style = stroke)
-
-            // Two main diagonals
             drawLine(lineColor, Offset(0f, 0f), Offset(w, h), strokeWidth = 3f)
             drawLine(lineColor, Offset(w, 0f), Offset(0f, h), strokeWidth = 3f)
 
-            // Inner diamond connecting midpoints
             val topMid = Offset(w / 2f, 0f)
             val rightMid = Offset(w, h / 2f)
             val bottomMid = Offset(w / 2f, h)
@@ -66,7 +90,6 @@ fun NorthIndianKundaliChart(
             drawLine(lineColor, bottomMid, leftMid, strokeWidth = 3.5f)
             drawLine(lineColor, leftMid, topMid, strokeWidth = 3.5f)
 
-            // Approximate centers for the 12 North-Indian houses (counter-clockwise starting top-center diamond = House 1)
             val houseCenters = mapOf(
                 1 to Offset(w * 0.50f, h * 0.26f),
                 2 to Offset(w * 0.25f, h * 0.12f),
@@ -82,31 +105,8 @@ fun NorthIndianKundaliChart(
                 12 to Offset(w * 0.75f, h * 0.12f)
             )
 
-            val rashiPaint = android.graphics.Paint().apply {
-                isAntiAlias = true
-                color = android.graphics.Color.argb(
-                    (houseNumColor.alpha * 255).toInt(),
-                    (houseNumColor.red * 255).toInt(),
-                    (houseNumColor.green * 255).toInt(),
-                    (houseNumColor.blue * 255).toInt()
-                )
-                textSize = w * 0.036f
-                textAlign = android.graphics.Paint.Align.CENTER
-                isFakeBoldText = true
-            }
-
-            val planetPaint = android.graphics.Paint().apply {
-                isAntiAlias = true
-                color = android.graphics.Color.argb(
-                    (planetTextColor.alpha * 255).toInt(),
-                    (planetTextColor.red * 255).toInt(),
-                    (planetTextColor.green * 255).toInt(),
-                    (planetTextColor.blue * 255).toInt()
-                )
-                textSize = w * 0.042f
-                textAlign = android.graphics.Paint.Align.CENTER
-                isFakeBoldText = true
-            }
+            rashiPaint.textSize = w * 0.036f
+            planetPaint.textSize = w * 0.042f
 
             for (house in 1..12) {
                 val center = houseCenters[house] ?: continue

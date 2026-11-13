@@ -169,6 +169,9 @@ class AstrologyViewModel(
     private val _dailyHoroscopeAiState = MutableStateFlow<AiGenerationState>(AiGenerationState.Idle)
     val dailyHoroscopeAiState: StateFlow<AiGenerationState> = _dailyHoroscopeAiState.asStateFlow()
 
+    private val horoscopeCache = mutableMapOf<String, String>()
+    private var lastFetchedRashiId: String? = null
+
     // --- KUNDALI CHART & AI ANALYSIS STATE ---
     private val _activeKundaliChart = MutableStateFlow(
         VedicAstrologyEngine.calculateKundaliChart("Aarav Sharma", "1998-05-14", "10:30", "Varanasi, UP")
@@ -232,8 +235,29 @@ class AstrologyViewModel(
     fun selectRashi(rashiId: String) {
         viewModelScope.launch {
             preferencesRepository.setSelectedRashi(rashiId)
-            _dailyHoroscopeAiState.value = AiGenerationState.Idle
+            val cached = horoscopeCache[rashiId]
+            if (cached != null) {
+                lastFetchedRashiId = rashiId
+                _dailyHoroscopeAiState.value = AiGenerationState.Success(cached)
+            } else {
+                generatePersonalizedDailyHoroscope(rashiId, forceRefresh = true)
+            }
         }
+    }
+
+    fun ensureDailyHoroscopeLoaded(rashiId: String) {
+        val cached = horoscopeCache[rashiId]
+        if (cached != null) {
+            if (_dailyHoroscopeAiState.value !is AiGenerationState.Success || lastFetchedRashiId != rashiId) {
+                lastFetchedRashiId = rashiId
+                _dailyHoroscopeAiState.value = AiGenerationState.Success(cached)
+            }
+            return
+        }
+        if (_dailyHoroscopeAiState.value is AiGenerationState.Loading && lastFetchedRashiId == rashiId) {
+            return
+        }
+        generatePersonalizedDailyHoroscope(rashiId, forceRefresh = false)
     }
 
     fun updateNotificationSettings(
@@ -261,21 +285,39 @@ class AstrologyViewModel(
     }
 
     // --- 1. AI PERSONALIZED DAILY HOROSCOPE ---
-    fun generatePersonalizedDailyHoroscope(rashiId: String) {
+    fun generatePersonalizedDailyHoroscope(rashiId: String, forceRefresh: Boolean = true) {
+        if (!forceRefresh) {
+            horoscopeCache[rashiId]?.let { cached ->
+                lastFetchedRashiId = rashiId
+                _dailyHoroscopeAiState.value = AiGenerationState.Success(cached)
+                return
+            }
+        }
+        lastFetchedRashiId = rashiId
         val sign = VedicAstrologyEngine.getSignById(rashiId)
         val panchang = VedicAstrologyEngine.getTodayPanchang()
+        val savedKundali = (savedKundalis.value as? DataListState.Success)?.items?.firstOrNull()
+        val personalContext = if (savedKundali != null) {
+            "- Seeker Name: ${savedKundali.name}, Saved Birth Rashi: ${savedKundali.rashi}, Nakshatra: ${savedKundali.nakshatra}, Lagna: ${savedKundali.lagna}"
+        } else {
+            "- Saved Zodiac Sign Profile: ${sign.sanskritName} (${sign.englishName})"
+        }
+
         val prompt = """
             You are an expert Vedic Jyotish Acharya on the JevanMantra app.
-            Provide a deeply personalized, uplifting, and actionable Daily Rashifal (Horoscope) for:
-            - Rashi: ${sign.sanskritName} (${sign.englishName} - ${sign.hindiTitle})
+            Provide a deeply personalized, uplifting, and actionable Daily Horoscope (Rashifal) for the user's saved zodiac sign:
+            - Zodiac Sign (Rashi): ${sign.sanskritName} (${sign.englishName} - ${sign.hindiTitle})
             - Ruling Planet: ${sign.rulingPlanet}, Element: ${sign.element}
+            - Lucky Color: ${sign.luckyColor}, Lucky Number: ${sign.luckyNumber}
+            $personalContext
             - Today's Panchang: ${panchang.dateFormatted}, Tithi: ${panchang.tithi}, Nakshatra: ${panchang.nakshatra}, Yoga: ${panchang.yoga}
             
             Format with clear sections using concise bullet points:
-            1. Career & Finance (Karmakshetra & Arthik)
-            2. Love & Family Harmony (Prem & Parivar)
-            3. Health & Vitality (Swasthya)
-            4. Today's Vedic Upay & Mantra (Remedy of the Day)
+            1. Personalized Cosmic Overview
+            2. Career & Finance (Karmakshetra & Arthik)
+            3. Love & Family Harmony (Prem & Parivar)
+            4. Health & Vitality (Swasthya)
+            5. Today's Vedic Upay & Mantra (Remedy of the Day)
         """.trimIndent()
 
         viewModelScope.launch {
@@ -288,8 +330,10 @@ class AstrologyViewModel(
                         _dailyHoroscopeAiState.value = AiGenerationState.Streaming(accumulated.toString())
                     }
                 }
-                if (accumulated.isNotBlank()) {
-                    _dailyHoroscopeAiState.value = AiGenerationState.Success(accumulated.toString())
+                val finalHoroscope = accumulated.toString()
+                if (finalHoroscope.isNotBlank()) {
+                    horoscopeCache[rashiId] = finalHoroscope
+                    _dailyHoroscopeAiState.value = AiGenerationState.Success(finalHoroscope)
                 } else {
                     _dailyHoroscopeAiState.value = AiGenerationState.Error("Model returned an empty horoscope.")
                 }

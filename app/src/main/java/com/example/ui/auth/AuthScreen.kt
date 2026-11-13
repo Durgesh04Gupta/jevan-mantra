@@ -231,6 +231,10 @@ fun AuthScreen(
     val errorMessage = (authState as? UserAuthUiState.Error)?.message
 
     LaunchedEffect(Unit) {
+        // Allow initial Activity window sync (SurfaceSyncGroup) to finish rendering first frame
+        // before initiating cross-process Play Services CredentialManager IPC.
+        androidx.compose.runtime.withFrameNanos { }
+        kotlinx.coroutines.delay(350L)
         authViewModel.attemptSilentSignIn(
             context = context,
             credentialManager = credentialManager
